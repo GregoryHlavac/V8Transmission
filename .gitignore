@@ -28,3 +28,6 @@ third_party/*
 Debug/*
 Release/*
 ipch/*
+*.opensdf
+*.suo
+*.sdf

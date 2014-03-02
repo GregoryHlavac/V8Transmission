@@ -73,7 +73,38 @@ namespace V8Transmission
 			};
 #pragma endregion
 		}
+
+
+		namespace Convert_Expand_Execute_Raw_Function_Pointer
+		{
+#pragma region Argument Expansion
+			template <int I, int N, typename ReturnType, typename... Args>
+			struct Expander
+			{
+				template<class... Expanded>
+				static void expand(ReturnType (*NativeFunction)(Args...), const v8::FunctionCallbackInfo<v8::Value>& args, const Expanded&... expanded)
+				{
+					Expander<I + 1, N, ReturnType, Args...>::expand(NativeFunction, args, expanded..., args[I]);
+				}
+			};
+
+			template <int I, typename ReturnType, typename... Args>
+			struct Expander<I, I, ReturnType, Args...>
+			{
+				template<class... Expanded>
+				static void expand(ReturnType(*NativeFunction)(Args...), const v8::FunctionCallbackInfo<v8::Value>& args, const Expanded&... expanded)
+				{
+					NativeFunction(ConvertFromJS<Args>(args.GetIsolate(), expanded)...);
+				}
+			};
+#pragma endregion
+		}
 	}
+
+	struct Invokable
+	{
+		static void Invoke(const v8::FunctionCallbackInfo<v8::Value>& args);
+	};
 
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,9 +124,12 @@ namespace V8Transmission
 	/// <typeparam name="ArgumentTypes">	Type of the argument types. </typeparam>
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	template <typename ReturnType, typename... ArgumentTypes>
-	class FunctionGear {
+	class FunctionGear 
+	{
+		typedef std::function<ReturnType(ArgumentTypes...)> NativeFunction;
+
 	public:
-		FunctionGear(std::function<ReturnType(ArgumentTypes...)> func) : mNativeFunction(func) { }
+		FunctionGear(NativeFunction func) : mNativeFunction(func) { }
 
  		ReturnType Invoke(const v8::FunctionCallbackInfo<v8::Value>& args)
 		{
@@ -103,8 +137,25 @@ namespace V8Transmission
 		}
 
 	private:
-		std::function<ReturnType(ArgumentTypes...)> mNativeFunction;
+		NativeFunction mNativeFunction;
 	};
+
+
+	template < typename ReturnType, typename... ArgumentTypes>
+	struct StaticFunctionGear
+	{
+		template <ReturnType (*Func) (ArgumentTypes...)>
+		//template <std::function<ReturnType(ArgumentTypes...)> Func>
+		static void Invoke(const v8::FunctionCallbackInfo<v8::Value>& args)
+		{
+			Internal::Convert_Expand_Execute_Raw_Function_Pointer::Expander<0, sizeof...(ArgumentTypes), ReturnType, ArgumentTypes...>::expand(Func, args);
+		}
+	};
+
+
+
+
+
 #pragma endregion
 
 }

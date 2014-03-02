@@ -79,6 +79,14 @@ const char* ToCString(const String::Utf8Value& value) {
 }
 
 
+int xc(std::string first, std::string second)
+{
+	std::cout << "First & Second" << std::endl << first << "|" << second << std::endl;
+
+	return 0;
+}
+
+
 // Creates a new execution environment containing the built-in
 // functions.
 Handle<v8::Context> CreateShellContext(v8::Isolate* isolate) {
@@ -92,6 +100,9 @@ Handle<v8::Context> CreateShellContext(v8::Isolate* isolate) {
 	global->Set(String::NewFromUtf8(isolate, "version"), FunctionTemplate::New(isolate, Version));
 
 	global->Set(String::NewFromUtf8(isolate, "dblValue"), FunctionTemplate::New(isolate, BindDouble));
+
+	global->Set(String::NewFromUtf8(isolate, "gear"), FunctionTemplate::New(isolate, StaticFunctionGear<int, std::string, std::string>::Invoke<xc>));
+
 
 	return v8::Context::New(isolate, NULL, global);
 }
@@ -117,12 +128,6 @@ void Print(const v8::FunctionCallbackInfo<Value>& args) {
 	}
 	printf("\n");
 	fflush(stdout);
-
-
-
-	FunctionGear<void, std::string, std::string> fgear([&](std::string first, std::string second) { std::cout << "First & Second" << first << "|" << second << std::endl; });
-
-	fgear.Invoke(args);
 }
 
 
