@@ -11,3 +11,20 @@
 *.lai
 *.la
 *.a
+*.log
+*.tlog
+*.obj
+*.user
+*.pch
+*.pdb
+*.lastbuildstate
+*.idb
+*.lib
+
+# V8 Stuff.
+third_party/*
+
+# Binaries
+Debug/*
+Release/*
+ipch/*

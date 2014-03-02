@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.30110.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "V8Transmission", "V8Transmission\V8Transmission.vcxproj", "{968D41E9-C210-4672-848F-4DB253CE121A}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Oil Change", "Oil Change\Oil Change.vcxproj", "{CCE88718-1A8B-483B-B1F0-66372CF6645C}"
+	ProjectSection(ProjectDependencies) = postProject
+		{968D41E9-C210-4672-848F-4DB253CE121A} = {968D41E9-C210-4672-848F-4DB253CE121A}
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{968D41E9-C210-4672-848F-4DB253CE121A}.Debug|Win32.ActiveCfg = Debug|Win32
+		{968D41E9-C210-4672-848F-4DB253CE121A}.Debug|Win32.Build.0 = Debug|Win32
+		{968D41E9-C210-4672-848F-4DB253CE121A}.Release|Win32.ActiveCfg = Release|Win32
+		{968D41E9-C210-4672-848F-4DB253CE121A}.Release|Win32.Build.0 = Release|Win32
+		{CCE88718-1A8B-483B-B1F0-66372CF6645C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{CCE88718-1A8B-483B-B1F0-66372CF6645C}.Debug|Win32.Build.0 = Debug|Win32
+		{CCE88718-1A8B-483B-B1F0-66372CF6645C}.Release|Win32.ActiveCfg = Release|Win32
+		{CCE88718-1A8B-483B-B1F0-66372CF6645C}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
