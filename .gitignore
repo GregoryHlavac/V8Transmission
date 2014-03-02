@@ -38,3 +38,4 @@ ipch/
 *.opensdf
 *.sdf
 *.cachefile
+*.suo
