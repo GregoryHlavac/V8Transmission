@@ -31,3 +31,10 @@ ipch/*
 *.opensdf
 *.suo
 *.sdf
+
+ipch/
+*.aps
+*.ncb
+*.opensdf
+*.sdf
+*.cachefile
