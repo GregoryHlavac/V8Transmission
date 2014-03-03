@@ -49,32 +49,6 @@ namespace V8Transmission
 
 	namespace Internal
 	{
-		namespace Convert_Expand_Execute
-		{
-#pragma region Argument Expansion
-			template <int I, int N, typename ReturnType, typename... Args>
-			struct Expander
-			{
-				template<class... Expanded>
-				static void expand(std::function<ReturnType(Args...)>& NativeFunction, const v8::FunctionCallbackInfo<v8::Value>& args, const Expanded&... expanded)
-				{
-					Expander<I + 1, N, ReturnType, Args...>::expand(NativeFunction, args, expanded..., args[I]);
-				}
-			};
-
-			template <int I, typename ReturnType, typename... Args>
-			struct Expander<I, I, ReturnType, Args...>
-			{
-				template<class... Expanded>
-				static void expand(const std::function<ReturnType(Args...)>& NativeFunction, const v8::FunctionCallbackInfo<v8::Value>& args, const Expanded&... expanded)
-				{
-					NativeFunction(ConvertFromJS<Args>(args.GetIsolate(), expanded)...);
-				}
-			};
-#pragma endregion
-		}
-
-
 		namespace Convert_Expand_Execute_Raw_Function_Pointer
 		{
 #pragma region Argument Expansion
@@ -99,6 +73,32 @@ namespace V8Transmission
 			};
 #pragma endregion
 		}
+
+
+		namespace Convert_Expand_Execute_Member_Function_Pointer
+		{
+#pragma region Argument Expansion
+			template <int I, int N, class ThisClass, typename ReturnType, typename... Args>
+			struct Expander
+			{
+				template<class... Expanded>
+				static void expand(ThisClass* ptr, ReturnType(ThisClass::*MemberFunction) (Args...), const v8::FunctionCallbackInfo<v8::Value>& args, const Expanded&... expanded)
+				{
+					Expander<I + 1, N, ThisClass, ReturnType, Args...>::expand(ptr, MemberFunction, args, expanded..., args[I]);
+				}
+			};
+
+			template <int I, class ThisClass, typename ReturnType, typename... Args>
+			struct Expander<I, I, ThisClass, ReturnType, Args...>
+			{
+				template<class... Expanded>
+				static void expand(ThisClass* ptr, ReturnType(ThisClass::*MemberFunction) (Args...), const v8::FunctionCallbackInfo<v8::Value>& args, const Expanded&... expanded)
+				{
+					(ptr->*MemberFunction)(ConvertFromJS<Args>(args.getIsolate(), expanded)...);
+				}
+			};
+#pragma endregion
+		}
 	}
 
 	struct Invokable
@@ -106,49 +106,58 @@ namespace V8Transmission
 		static void Invoke(const v8::FunctionCallbackInfo<v8::Value>& args);
 	};
 
-
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	/// <summary>
-	/// 	A function gear.
+	/// 	A static function gear.
 	/// 	
-	/// 	This is used to bind a JS executable target to some code on the native side, as of yet it
-	/// 	lacks any sort of error checking, so don't really go throwing this thing around willy-nilly
-	/// 	without being sure that the stuff you're pulling from JS side are the types, that they're supposed
-	/// 	to be (Or at the very least to be cast-able).
+	/// 	Used to bind an arbitrary static or global function to javascript.
 	/// 	
+	/// 	Example
 	/// 	
-	/// 	Props to BD-Calvin and SlashLife in C++ channel on QuakeNet for helping me through this obnoxious bit.
+	/// 	int sum(int x, int y) { return x+y; }
+	/// 	
+	/// 	...
+	/// 	global->Set(String::NewFromUtf8(isolate, "sum"), FunctionTemplate::New(isolate, StaticFunctionGear<int, int, int>::Invoke<sum>));
+	///		...
+	/// 
 	/// </summary>
 	///
 	/// <typeparam name="ReturnType">   	Type of the return type. </typeparam>
 	/// <typeparam name="ArgumentTypes">	Type of the argument types. </typeparam>
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	template <typename ReturnType, typename... ArgumentTypes>
-	class FunctionGear 
-	{
-		typedef std::function<ReturnType(ArgumentTypes...)> NativeFunction;
-
-	public:
-		FunctionGear(NativeFunction func) : mNativeFunction(func) { }
-
- 		ReturnType Invoke(const v8::FunctionCallbackInfo<v8::Value>& args)
-		{
-			return Internal::Convert_Expand_Execute::Expander<0, sizeof...(ArgumentTypes), ReturnType, ArgumentTypes...>::expand(mNativeFunction, args);
-		}
-
-	private:
-		NativeFunction mNativeFunction;
-	};
-
-
-	template < typename ReturnType, typename... ArgumentTypes>
 	struct StaticFunctionGear
 	{
 		template <ReturnType (*Func) (ArgumentTypes...)>
-		//template <std::function<ReturnType(ArgumentTypes...)> Func>
 		static void Invoke(const v8::FunctionCallbackInfo<v8::Value>& args)
 		{
 			Internal::Convert_Expand_Execute_Raw_Function_Pointer::Expander<0, sizeof...(ArgumentTypes), ReturnType, ArgumentTypes...>::expand(Func, args);
+		}
+	};
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	/// <summary>
+	/// 	A member function gear.
+	/// 	
+	/// 	Used to bind member functions on the specified class type.
+	/// </summary>
+	///
+	/// <typeparam name="ThisClass">		Type of this class. </typeparam>
+	/// <typeparam name="ReturnType">   	Type of the return type. </typeparam>
+	/// <typeparam name="ArgumentTypes">	Type of the argument types. </typeparam>
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	template <class ThisClass, typename ReturnType, typename... ArgumentTypes>
+	struct MemberFunctionGear
+	{
+		template <ReturnType (ThisClass::*MemberFunction) (ArgumentTypes...)>
+		static void Invoke(const v8::FunctionCallbackInfo<v8::Value>& args)
+		{
+			ThisClass* this_ptr = ConvertFromJS<ThisClass*>(args.GetIsolate(), args.Holder());
+
+			if (this_ptr)
+				Internal::Convert_Expand_Execute_Member_Function_Pointer::Expander<0, sizeof...(ArgumentTypes), ReturnType, ArgumentTypes...>::expand(this_ptr, MemberFunction, args);
+			
+			// TODO: Else some sort of error to avoid dereferencing a null pointer.
 		}
 	};
 

@@ -44,7 +44,6 @@ void BindDouble(const v8::FunctionCallbackInfo<Value>& args)
 
 static bool run_shell;
 
-
 int main(int argc, char* argv[]) 
 {
 	v8::V8::InitializeICU();
@@ -86,6 +85,37 @@ int xc(std::string first, std::string second)
 	return 0;
 }
 
+int xcx(std::string first, std::string second)
+{
+	std::cout << "FirstX & SecondX" << std::endl << first << "|" << second << std::endl;
+
+	return 0;
+}
+
+
+class RandomCrap
+{
+	int XPrint()
+	{
+		std::cout << "RandomCrap XPrint Called" << std::endl;
+	}
+};
+
+namespace V8Transmission
+{
+	namespace TypeConversion
+	{
+		template<>
+		struct ShiftNative<RandomCrap*>
+		{
+			RandomCrap* operator()(v8::Isolate* iso, const v8::Handle<v8::Value>& val) const
+			{
+				return new RandomCrap;
+			}
+		};
+	}
+}
+
 
 // Creates a new execution environment containing the built-in
 // functions.
@@ -102,6 +132,7 @@ Handle<v8::Context> CreateShellContext(v8::Isolate* isolate) {
 	global->Set(String::NewFromUtf8(isolate, "dblValue"), FunctionTemplate::New(isolate, BindDouble));
 
 	global->Set(String::NewFromUtf8(isolate, "gear"), FunctionTemplate::New(isolate, StaticFunctionGear<int, std::string, std::string>::Invoke<xc>));
+	global->Set(String::NewFromUtf8(isolate, "gearx"), FunctionTemplate::New(isolate, StaticFunctionGear<int, std::string, std::string>::Invoke<xcx>));
 
 
 	return v8::Context::New(isolate, NULL, global);
