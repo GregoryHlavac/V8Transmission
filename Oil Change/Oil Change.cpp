@@ -95,6 +95,11 @@ int xcx(std::string first, std::string second)
 
 class RandomCrap
 {
+public:
+	std::string vx = "VX String";
+
+	RandomCrap(){}
+
 	int XPrint()
 	{
 		std::cout << "RandomCrap XPrint Called" << std::endl;
@@ -116,6 +121,8 @@ namespace V8Transmission
 	}
 }
 
+typedef MemberVariableGear<RandomCrap, std::string, &RandomCrap::vx> RandomCrapVX;
+typedef ClassGear<RandomCrap> CGRC;
 
 // Creates a new execution environment containing the built-in
 // functions.
@@ -130,6 +137,15 @@ Handle<v8::Context> CreateShellContext(v8::Isolate* isolate) {
 	global->Set(String::NewFromUtf8(isolate, "version"), FunctionTemplate::New(isolate, Version));
 
 	global->Set(String::NewFromUtf8(isolate, "dblValue"), FunctionTemplate::New(isolate, BindDouble));
+
+
+
+// 	global->Set(String::NewFromUtf8(isolate, "RandomCrap"), FunctionTemplate::New(isolate, CGRC::ConstructHandle));
+
+ 	ClassGear<RandomCrap>::Initialize(isolate);
+ 	ClassGear<RandomCrap>::Bind(isolate, global);
+
+	global->SetAccessor(String::NewFromUtf8(isolate, "lol"), RandomCrapVX::Getter);
 
 	global->Set(String::NewFromUtf8(isolate, "gear"), FunctionTemplate::New(isolate, StaticFunctionGear<int, std::string, std::string>::Invoke<xc>));
 	global->Set(String::NewFromUtf8(isolate, "gearx"), FunctionTemplate::New(isolate, StaticFunctionGear<int, std::string, std::string>::Invoke<xcx>));

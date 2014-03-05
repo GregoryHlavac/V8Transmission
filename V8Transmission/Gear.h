@@ -10,6 +10,17 @@
 
 #include "V8Transmission.h"
 
+using v8::Value;
+using v8::Local;
+using v8::Handle;
+using v8::Object;
+using v8::Isolate;
+using v8::External;
+using v8::Persistent;
+using v8::ObjectTemplate;
+using v8::FunctionTemplate;
+using v8::FunctionCallbackInfo;
+
 namespace V8Transmission
 {
 	////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -22,12 +33,11 @@ namespace V8Transmission
 	/// <typeparam name="T">	Generic type parameter. </typeparam>
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	template <typename T>
-	class NativeTypeFactory
+	struct NativeTypeFactory
 	{
-	public:
 		typedef T* ReturnType;
 
-		static ReturnType Construct(const v8::FunctionCallbackInfo<v8::Value> arguments)
+		static ReturnType Construct(const FunctionCallbackInfo<Value>& arguments)
 		{
 			return new T;
 		}
@@ -36,15 +46,89 @@ namespace V8Transmission
 		{
 			delete obj;
 		}
+
+		static std::string* Identifier()
+		{
+			static std::string* chrName = new std::string(typeid(T).name());
+
+			return chrName;
+		}
 	};
 
-
-	template <typename T>
-	class ClassGear
+	template <typename NativeType, typename TypeFactory = NativeTypeFactory<NativeType> >
+	struct ClassGear
 	{
-		typedef T Type;
+		static Persistent<FunctionTemplate>	ConstructorTemplate;
+		static Persistent<ObjectTemplate>	PrototypeTemplate;
+
+		//typedef typename BaseType		DerivedFrom;
+		typedef typename TypeFactory	Factory;
+
+		typedef NativeType* NTPtr;
+
+		static void Initialize(Isolate* iso)
+		{
+			Local<FunctionTemplate> ctorTemplate = FunctionTemplate::New(iso, ConstructHandle);
+			ctorTemplate->SetClassName(v8::String::NewFromUtf8(iso, Factory::Identifier()->c_str()));
+
+			Local<ObjectTemplate> protoTmpl = ctorTemplate->PrototypeTemplate();
+			protoTmpl->SetInternalFieldCount(2);
+
+			if (ConstructorTemplate.IsEmpty())
+				ConstructorTemplate.Reset(iso, ctorTemplate);
+		}
+
+
+		static void Bind(Isolate* iso, const Handle<ObjectTemplate>& tmpl)
+		{
+			Local<FunctionTemplate> ctorTemplate = Local<FunctionTemplate>::New(iso, ConstructorTemplate);
+
+			std::cout << "Type bound with identifier: " << std::string(Factory::Identifier()->c_str()) << std::endl;
+
+			tmpl->Set(iso, Factory::Identifier()->c_str(), ctorTemplate);
+		}
+
+
+		static void ConstructHandle(const FunctionCallbackInfo<Value>& arguments)
+		{
+			NTPtr new_object = Factory::Construct(arguments);
+
+			arguments.GetReturnValue().Set(Wrap(arguments.GetIsolate(), new_object));
+		}
+
+		static Handle<Object> Wrap(Isolate* iso, NTPtr native_ptr)
+		{
+			if (PrototypeTemplate.IsEmpty())
+				PrototypeTemplate.Reset(iso, Local<FunctionTemplate>::New(iso, ConstructorTemplate)->PrototypeTemplate());
+
+			Local<ObjectTemplate> tmpl = Local<ObjectTemplate>::New(iso, PrototypeTemplate);
+			Handle<Object> result = tmpl->NewInstance();
+
+			Handle<External> internal_ptr = v8::External::New(iso, native_ptr);
+			result->SetInternalField(0, internal_ptr);
+
+			Handle<External> type_ptr = v8::External::New(iso, Factory::Identifier());
+			result->SetInternalField(1, type_ptr);
+
+			return result;
+		}
+
 	};
 
+	template <typename NativeType, typename TypeFactory>
+	Persistent<FunctionTemplate> V8Transmission::ClassGear<NativeType, TypeFactory>::ConstructorTemplate;
+
+	template <typename NativeType, typename TypeFactory>
+	Persistent<ObjectTemplate> V8Transmission::ClassGear<NativeType, TypeFactory>::PrototypeTemplate;
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	/// <summary>
+	///		Void class gear to cut off infinite recursion, and doesn't do anything, acts as an abstract
+	///		base class that does nothing.
+	/// </summary>
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	template<>
+	struct ClassGear<void> {};
 
 
 	namespace Internal
@@ -56,7 +140,7 @@ namespace V8Transmission
 			struct Expander
 			{
 				template<class... Expanded>
-				static void expand(ReturnType (*NativeFunction)(Args...), const v8::FunctionCallbackInfo<v8::Value>& args, const Expanded&... expanded)
+				static void expand(ReturnType(*NativeFunction)(Args...), const FunctionCallbackInfo<Value>& args, const Expanded&... expanded)
 				{
 					Expander<I + 1, N, ReturnType, Args...>::expand(NativeFunction, args, expanded..., args[I]);
 				}
@@ -66,7 +150,7 @@ namespace V8Transmission
 			struct Expander<I, I, ReturnType, Args...>
 			{
 				template<class... Expanded>
-				static void expand(ReturnType(*NativeFunction)(Args...), const v8::FunctionCallbackInfo<v8::Value>& args, const Expanded&... expanded)
+				static void expand(ReturnType(*NativeFunction)(Args...), const FunctionCallbackInfo<Value>& args, const Expanded&... expanded)
 				{
 					NativeFunction(ConvertFromJS<Args>(args.GetIsolate(), expanded)...);
 				}
@@ -82,7 +166,7 @@ namespace V8Transmission
 			struct Expander
 			{
 				template<class... Expanded>
-				static void expand(ThisClass* ptr, ReturnType(ThisClass::*MemberFunction) (Args...), const v8::FunctionCallbackInfo<v8::Value>& args, const Expanded&... expanded)
+				static void expand(ThisClass* ptr, ReturnType(ThisClass::*MemberFunction) (Args...), const FunctionCallbackInfo<Value>& args, const Expanded&... expanded)
 				{
 					Expander<I + 1, N, ThisClass, ReturnType, Args...>::expand(ptr, MemberFunction, args, expanded..., args[I]);
 				}
@@ -92,7 +176,7 @@ namespace V8Transmission
 			struct Expander<I, I, ThisClass, ReturnType, Args...>
 			{
 				template<class... Expanded>
-				static void expand(ThisClass* ptr, ReturnType(ThisClass::*MemberFunction) (Args...), const v8::FunctionCallbackInfo<v8::Value>& args, const Expanded&... expanded)
+				static void expand(ThisClass* ptr, ReturnType(ThisClass::*MemberFunction) (Args...), const FunctionCallbackInfo<Value>& args, const Expanded&... expanded)
 				{
 					(ptr->*MemberFunction)(ConvertFromJS<Args>(args.getIsolate(), expanded)...);
 				}
@@ -103,7 +187,7 @@ namespace V8Transmission
 
 	struct Invokable
 	{
-		static void Invoke(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Invoke(const FunctionCallbackInfo<Value>& args);
 	};
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -129,12 +213,15 @@ namespace V8Transmission
 	struct StaticFunctionGear
 	{
 		template <ReturnType (*Func) (ArgumentTypes...)>
-		static void Invoke(const v8::FunctionCallbackInfo<v8::Value>& args)
+		static void Invoke(const FunctionCallbackInfo<Value>& args)
 		{
 			Internal::Convert_Expand_Execute_Raw_Function_Pointer::Expander<0, sizeof...(ArgumentTypes), ReturnType, ArgumentTypes...>::expand(Func, args);
 		}
 	};
 
+
+
+#pragma region Class/Member Related
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	/// <summary>
 	/// 	A member function gear.
@@ -150,21 +237,40 @@ namespace V8Transmission
 	struct MemberFunctionGear
 	{
 		template <ReturnType (ThisClass::*MemberFunction) (ArgumentTypes...)>
-		static void Invoke(const v8::FunctionCallbackInfo<v8::Value>& args)
+		static void Invoke(const FunctionCallbackInfo<Value>& args)
 		{
 			ThisClass* this_ptr = ConvertFromJS<ThisClass*>(args.GetIsolate(), args.Holder());
 
 			if (this_ptr)
 				Internal::Convert_Expand_Execute_Member_Function_Pointer::Expander<0, sizeof...(ArgumentTypes), ReturnType, ArgumentTypes...>::expand(this_ptr, MemberFunction, args);
-			
+
 			// TODO: Else some sort of error to avoid dereferencing a null pointer.
 		}
 	};
 
-
-
-
-
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	/// <summary>
+	/// 	A member variable gear.
+	/// </summary>
+	///
+	/// <typeparam name="ThisClass">				   	Type of this class. </typeparam>
+	/// <typeparam name="VariableType">				   	Type of the variable type. </typeparam>
+	/// <typeparam name="(ThisClass::*MemberVariable)">	Type of this class * member variable) </typeparam>
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	template <typename ThisClass, typename VariableType, VariableType (ThisClass::*MemberVariable)>
+	struct MemberVariableGear
+	{
+		static void Getter(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info)
+		{
+			ThisClass* var = ConvertFromJS<ThisClass*>(info.GetIsolate(), info.Holder());
+			info.GetReturnValue().Set(ConvertToJS<VariableType>(info.GetIsolate(), (var->*MemberVariable)));
+		}
+		static void Setter(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+		{
+			ThisClass* var = ConvertFromJS<ThisClass*>(info.GetIsolate(), info.Holder());
+			(var->*MemberVariable) = ConvertFromJS<VariableType>(iso, value);
+		}
+	};
 #pragma endregion
 
 }
