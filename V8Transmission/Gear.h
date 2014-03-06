@@ -10,6 +10,11 @@
 
 #include "V8Transmission.h"
 
+#include "Common.h"
+
+#include "FunctionGears.h"
+#include "VariableGears.h"
+
 using v8::Value;
 using v8::Local;
 using v8::Handle;
@@ -23,6 +28,44 @@ using v8::FunctionCallbackInfo;
 
 namespace V8Transmission
 {
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	/// <summary>
+	/// 	A ClassOption that specifies whether or not a class can be constructed without the 'new'
+	/// 	keyword on the javascript side, in reality this just enables a sort of behind the scenes
+	/// 	auto-redirect to the new operator, if anything its just a shortcut and makes your JS less
+	/// 	concise so it isn't recommended to enable this unless you've got a good reason.
+	/// </summary>
+	///
+	/// <typeparam name="T">	Generic type parameter. </typeparam>
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	template <typename T>
+	struct CO_AllowConstructorWithoutNew : Boolean_Option<false> {};
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	/// <summary>
+	/// 	A ClassOption to enable a primitive form of garbage collection for a class to track javascript
+	/// 	side classes that were instantiated and linked to a native class.
+	/// 	
+	/// 	This isn't implemented yet, but will likely utilize std::shared_ptr and weak_ptr.
+	/// </summary>
+	///
+	/// <typeparam name="T">	Generic type parameter. </typeparam>
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	template <typename T>
+	struct CO_EnableSmartPointerGC : Boolean_Option<false> {};
+
+	template <typename T>
+	struct CO_Identifier
+	{
+		static std::string* Value()
+		{
+			static std::string* id = new std::string(typeid(T).name);
+
+			return id;
+		}
+	};
+
+
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	/// <summary>
 	///		Base policy template used by the wrapper to create objects from JS arguments.
@@ -46,13 +89,6 @@ namespace V8Transmission
 		{
 			delete obj;
 		}
-
-		static std::string* Identifier()
-		{
-			static std::string* chrName = new std::string(typeid(T).name());
-
-			return chrName;
-		}
 	};
 
 	template <typename NativeType, typename TypeFactory = NativeTypeFactory<NativeType> >
@@ -69,23 +105,35 @@ namespace V8Transmission
 		static void Initialize(Isolate* iso)
 		{
 			Local<FunctionTemplate> ctorTemplate = FunctionTemplate::New(iso, ConstructHandle);
-			ctorTemplate->SetClassName(v8::String::NewFromUtf8(iso, Factory::Identifier()->c_str()));
+			ctorTemplate->SetClassName(v8::String::NewFromUtf8(iso, CO_Identifier<NativeType>::Value()->c_str()));
 
 			Local<ObjectTemplate> protoTmpl = ctorTemplate->PrototypeTemplate();
 			protoTmpl->SetInternalFieldCount(2);
 
 			if (ConstructorTemplate.IsEmpty())
 				ConstructorTemplate.Reset(iso, ctorTemplate);
+
+			if (PrototypeTemplate.IsEmpty())
+				PrototypeTemplate.Reset(iso, protoTmpl);
 		}
 
 
 		static void Bind(Isolate* iso, const Handle<ObjectTemplate>& tmpl)
 		{
+			HandleScope scope(iso);
+
 			Local<FunctionTemplate> ctorTemplate = Local<FunctionTemplate>::New(iso, ConstructorTemplate);
 
-			std::cout << "Type bound with identifier: " << std::string(Factory::Identifier()->c_str()) << std::endl;
+			tmpl->Set(iso, CO_Identifier<NativeType>::Value()->c_str(), ctorTemplate);
+		}
 
-			tmpl->Set(iso, Factory::Identifier()->c_str(), ctorTemplate);
+		template <typename ReturnType, typename... ArgumentTypes>
+		static void BindMemberFunction(Isolate* iso, const char* fncName, ReturnType(NativeType::*MemberFunction) (ArgumentTypes...))
+		{
+			Local<ObjectTemplate> protoTmpl = Local<ObjectTemplate>::New(iso, PrototypeTemplate);
+			Local<FunctionTemplate> lft = FunctionTemplate::New(iso, MemberFunctionGear<NativeType, ReturnType, ArgumentTypes...>::Invoke<MemberFunction>);
+
+			protoTmpl->Set(String::NewFromUtf8(iso, fncName), lft);
 		}
 
 
@@ -107,7 +155,7 @@ namespace V8Transmission
 			Handle<External> internal_ptr = v8::External::New(iso, native_ptr);
 			result->SetInternalField(0, internal_ptr);
 
-			Handle<External> type_ptr = v8::External::New(iso, Factory::Identifier());
+			Handle<External> type_ptr = v8::External::New(iso, CO_Identifier<NativeType>::Value);
 			result->SetInternalField(1, type_ptr);
 
 			return result;
@@ -129,148 +177,4 @@ namespace V8Transmission
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	template<>
 	struct ClassGear<void> {};
-
-
-	namespace Internal
-	{
-		namespace Convert_Expand_Execute_Raw_Function_Pointer
-		{
-#pragma region Argument Expansion
-			template <int I, int N, typename ReturnType, typename... Args>
-			struct Expander
-			{
-				template<class... Expanded>
-				static void expand(ReturnType(*NativeFunction)(Args...), const FunctionCallbackInfo<Value>& args, const Expanded&... expanded)
-				{
-					Expander<I + 1, N, ReturnType, Args...>::expand(NativeFunction, args, expanded..., args[I]);
-				}
-			};
-
-			template <int I, typename ReturnType, typename... Args>
-			struct Expander<I, I, ReturnType, Args...>
-			{
-				template<class... Expanded>
-				static void expand(ReturnType(*NativeFunction)(Args...), const FunctionCallbackInfo<Value>& args, const Expanded&... expanded)
-				{
-					NativeFunction(ConvertFromJS<Args>(args.GetIsolate(), expanded)...);
-				}
-			};
-#pragma endregion
-		}
-
-
-		namespace Convert_Expand_Execute_Member_Function_Pointer
-		{
-#pragma region Argument Expansion
-			template <int I, int N, class ThisClass, typename ReturnType, typename... Args>
-			struct Expander
-			{
-				template<class... Expanded>
-				static void expand(ThisClass* ptr, ReturnType(ThisClass::*MemberFunction) (Args...), const FunctionCallbackInfo<Value>& args, const Expanded&... expanded)
-				{
-					Expander<I + 1, N, ThisClass, ReturnType, Args...>::expand(ptr, MemberFunction, args, expanded..., args[I]);
-				}
-			};
-
-			template <int I, class ThisClass, typename ReturnType, typename... Args>
-			struct Expander<I, I, ThisClass, ReturnType, Args...>
-			{
-				template<class... Expanded>
-				static void expand(ThisClass* ptr, ReturnType(ThisClass::*MemberFunction) (Args...), const FunctionCallbackInfo<Value>& args, const Expanded&... expanded)
-				{
-					(ptr->*MemberFunction)(ConvertFromJS<Args>(args.getIsolate(), expanded)...);
-				}
-			};
-#pragma endregion
-		}
-	}
-
-	struct Invokable
-	{
-		static void Invoke(const FunctionCallbackInfo<Value>& args);
-	};
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	/// <summary>
-	/// 	A static function gear.
-	/// 	
-	/// 	Used to bind an arbitrary static or global function to javascript.
-	/// 	
-	/// 	Example
-	/// 	
-	/// 	int sum(int x, int y) { return x+y; }
-	/// 	
-	/// 	...
-	/// 	global->Set(String::NewFromUtf8(isolate, "sum"), FunctionTemplate::New(isolate, StaticFunctionGear<int, int, int>::Invoke<sum>));
-	///		...
-	/// 
-	/// </summary>
-	///
-	/// <typeparam name="ReturnType">   	Type of the return type. </typeparam>
-	/// <typeparam name="ArgumentTypes">	Type of the argument types. </typeparam>
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	template <typename ReturnType, typename... ArgumentTypes>
-	struct StaticFunctionGear
-	{
-		template <ReturnType (*Func) (ArgumentTypes...)>
-		static void Invoke(const FunctionCallbackInfo<Value>& args)
-		{
-			Internal::Convert_Expand_Execute_Raw_Function_Pointer::Expander<0, sizeof...(ArgumentTypes), ReturnType, ArgumentTypes...>::expand(Func, args);
-		}
-	};
-
-
-
-#pragma region Class/Member Related
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	/// <summary>
-	/// 	A member function gear.
-	/// 	
-	/// 	Used to bind member functions on the specified class type.
-	/// </summary>
-	///
-	/// <typeparam name="ThisClass">		Type of this class. </typeparam>
-	/// <typeparam name="ReturnType">   	Type of the return type. </typeparam>
-	/// <typeparam name="ArgumentTypes">	Type of the argument types. </typeparam>
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	template <class ThisClass, typename ReturnType, typename... ArgumentTypes>
-	struct MemberFunctionGear
-	{
-		template <ReturnType (ThisClass::*MemberFunction) (ArgumentTypes...)>
-		static void Invoke(const FunctionCallbackInfo<Value>& args)
-		{
-			ThisClass* this_ptr = ConvertFromJS<ThisClass*>(args.GetIsolate(), args.Holder());
-
-			if (this_ptr)
-				Internal::Convert_Expand_Execute_Member_Function_Pointer::Expander<0, sizeof...(ArgumentTypes), ReturnType, ArgumentTypes...>::expand(this_ptr, MemberFunction, args);
-
-			// TODO: Else some sort of error to avoid dereferencing a null pointer.
-		}
-	};
-
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	/// <summary>
-	/// 	A member variable gear.
-	/// </summary>
-	///
-	/// <typeparam name="ThisClass">				   	Type of this class. </typeparam>
-	/// <typeparam name="VariableType">				   	Type of the variable type. </typeparam>
-	/// <typeparam name="(ThisClass::*MemberVariable)">	Type of this class * member variable) </typeparam>
-	////////////////////////////////////////////////////////////////////////////////////////////////////
-	template <typename ThisClass, typename VariableType, VariableType (ThisClass::*MemberVariable)>
-	struct MemberVariableGear
-	{
-		static void Getter(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info)
-		{
-			ThisClass* var = ConvertFromJS<ThisClass*>(info.GetIsolate(), info.Holder());
-			info.GetReturnValue().Set(ConvertToJS<VariableType>(info.GetIsolate(), (var->*MemberVariable)));
-		}
-		static void Setter(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
-		{
-			ThisClass* var = ConvertFromJS<ThisClass*>(info.GetIsolate(), info.Holder());
-			(var->*MemberVariable) = ConvertFromJS<VariableType>(iso, value);
-		}
-	};
-#pragma endregion
-
 }

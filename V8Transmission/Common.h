@@ -12,6 +12,17 @@ namespace V8Transmission
 	/** Unimplemented - causes a compile-time error if used. */
 	template <> struct Assertion<false>;
 
-	// Because who wants to type this over and over and over again?
 	typedef v8::Handle<v8::Value> ValueHandle;
+
+	template <typename Type, Type Val>
+	struct Static_Option
+	{
+		static const Type Value = Val;
+	};
+
+	template <bool Val>
+	struct Boolean_Option : Static_Option<bool, Val> {};
+
+	template <int Val>
+	struct Integer_Option : Static_Option<int, Val> {};
 }

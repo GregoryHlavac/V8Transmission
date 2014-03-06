@@ -80,7 +80,9 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ClassGears.h" />
     <ClInclude Include="Common.h" />
+    <ClInclude Include="FunctionGears.h" />
     <ClInclude Include="Gear.h" />
     <ClInclude Include="Housing.h" />
     <ClInclude Include="NativeShifts.h" />
@@ -88,6 +90,7 @@
     <ClInclude Include="targetver.h" />
     <ClInclude Include="TypeConversion.h" />
     <ClInclude Include="V8Transmission.h" />
+    <ClInclude Include="VariableGears.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">

@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
 		}
 		context->Enter();
 
-		Handle<Value> stval = ConvertToJS(isolate, std::string("Hurr, Durr"));
+// 		Handle<Value> stval = ConvertToJS(isolate, std::string("Hurr, Durr"));
 
 		result = RunMain(isolate, argc, argv);
 		if (run_shell) RunShell(context);
@@ -103,6 +103,8 @@ public:
 	int XPrint()
 	{
 		std::cout << "RandomCrap XPrint Called" << std::endl;
+
+		return 0;
 	}
 };
 
@@ -121,6 +123,19 @@ namespace V8Transmission
 	}
 }
 
+template <>
+struct CO_Identifier<RandomCrap>
+{
+	static std::string* Value()
+	{
+		static std::string* id = new std::string("RandomCrap");
+
+		return id;
+	}
+};
+//CO_Identifier<RandomCrap>::Value = "RandomCrap";
+
+
 typedef MemberVariableGear<RandomCrap, std::string, &RandomCrap::vx> RandomCrapVX;
 typedef ClassGear<RandomCrap> CGRC;
 
@@ -138,14 +153,24 @@ Handle<v8::Context> CreateShellContext(v8::Isolate* isolate) {
 
 	global->Set(String::NewFromUtf8(isolate, "dblValue"), FunctionTemplate::New(isolate, BindDouble));
 
-
-
 // 	global->Set(String::NewFromUtf8(isolate, "RandomCrap"), FunctionTemplate::New(isolate, CGRC::ConstructHandle));
 
- 	ClassGear<RandomCrap>::Initialize(isolate);
- 	ClassGear<RandomCrap>::Bind(isolate, global);
+ 	CGRC::Initialize(isolate);
 
-	global->SetAccessor(String::NewFromUtf8(isolate, "lol"), RandomCrapVX::Getter);
+	//CGRC::BindMemberFunction<int>(isolate, "xPrint", &RandomCrap::XPrint);
+
+
+	MemberFunctionGear<RandomCrap, int>::Bind<&RandomCrap::XPrint>(isolate, "xPrint");
+
+	// This works.
+// 	Local<ObjectTemplate> protoTmpl = Local<ObjectTemplate>::New(isolate, CGRC::PrototypeTemplate);
+// 	Local<FunctionTemplate> lft = FunctionTemplate::New(isolate, MemberFunctionGear<RandomCrap, int>::Invoke<&RandomCrap::XPrint>);
+// 	protoTmpl->Set(String::NewFromUtf8(isolate, "xPrint"), lft);
+
+
+ 	CGRC::Bind(isolate, global);
+
+	//global->SetAccessor(String::NewFromUtf8(isolate, "lol"), RandomCrapVX::Getter);
 
 	global->Set(String::NewFromUtf8(isolate, "gear"), FunctionTemplate::New(isolate, StaticFunctionGear<int, std::string, std::string>::Invoke<xc>));
 	global->Set(String::NewFromUtf8(isolate, "gearx"), FunctionTemplate::New(isolate, StaticFunctionGear<int, std::string, std::string>::Invoke<xcx>));

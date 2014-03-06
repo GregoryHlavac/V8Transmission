@@ -42,6 +42,15 @@
     <ClInclude Include="Housing.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="FunctionGears.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="VariableGears.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ClassGears.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
