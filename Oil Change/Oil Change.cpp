@@ -9,6 +9,7 @@
 #include <string>
 #include <stdio.h>
 #include <stdlib.h>
+#include <iostream>
 
 #include "V8Transmission.h"
 
@@ -100,9 +101,9 @@ public:
 
 	RandomCrap(){}
 
-	int XPrint()
+	int XPrint(std::string oStr)
 	{
-		std::cout << "RandomCrap XPrint Called" << std::endl;
+		std::cout << "RandomCrap XPrint Called " << oStr << std::endl;
 
 		return 0;
 	}
@@ -137,7 +138,6 @@ struct CO_Identifier<RandomCrap>
 
 
 typedef MemberVariableGear<RandomCrap, std::string, &RandomCrap::vx> RandomCrapVX;
-typedef ClassGear<RandomCrap> CGRC;
 
 // Creates a new execution environment containing the built-in
 // functions.
@@ -148,19 +148,21 @@ Handle<v8::Context> CreateShellContext(v8::Isolate* isolate) {
 	global->Set(String::NewFromUtf8(isolate, "print"), FunctionTemplate::New(isolate, Print));
 	global->Set(String::NewFromUtf8(isolate, "read"), FunctionTemplate::New(isolate, Read));
 	global->Set(String::NewFromUtf8(isolate, "load"), FunctionTemplate::New(isolate, Load));
-	global->Set(String::NewFromUtf8(isolate, "quit"), FunctionTemplate::New(isolate, Quit));
+	global->Set(String::NewFromUtf8(isolate, "quit"), FunctionTemplate::New(isolate, Quit)); 
 	global->Set(String::NewFromUtf8(isolate, "version"), FunctionTemplate::New(isolate, Version));
 
 	global->Set(String::NewFromUtf8(isolate, "dblValue"), FunctionTemplate::New(isolate, BindDouble));
 
 // 	global->Set(String::NewFromUtf8(isolate, "RandomCrap"), FunctionTemplate::New(isolate, CGRC::ConstructHandle));
 
- 	CGRC::Initialize(isolate);
 
 	//CGRC::BindMemberFunction<int>(isolate, "xPrint", &RandomCrap::XPrint);
 
+	typedef ClassGear<RandomCrap> CGRC;
+	CGRC::Initialize(isolate);
+	MemberFunctionGear<RandomCrap, int, std::string>::Bind<&RandomCrap::XPrint>(isolate, "xPrint");
+	CGRC::Bind(isolate, global);
 
-	MemberFunctionGear<RandomCrap, int>::Bind<&RandomCrap::XPrint>(isolate, "xPrint");
 
 	// This works.
 // 	Local<ObjectTemplate> protoTmpl = Local<ObjectTemplate>::New(isolate, CGRC::PrototypeTemplate);
@@ -168,7 +170,6 @@ Handle<v8::Context> CreateShellContext(v8::Isolate* isolate) {
 // 	protoTmpl->Set(String::NewFromUtf8(isolate, "xPrint"), lft);
 
 
- 	CGRC::Bind(isolate, global);
 
 	//global->SetAccessor(String::NewFromUtf8(isolate, "lol"), RandomCrapVX::Getter);
 

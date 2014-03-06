@@ -6,7 +6,10 @@
 #include "TypeConversion.h"
 #include "NativeShifts.h"
 
-#include "Gear.h"
+#include "ClassGears.h"
+#include "ClassOptions.h"
+#include "FunctionGears.h"
+#include "VariableGears.h"
 
 namespace V8Transmission
 {
