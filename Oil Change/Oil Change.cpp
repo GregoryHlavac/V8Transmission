@@ -156,11 +156,11 @@ Handle<v8::Context> CreateShellContext(v8::Isolate* isolate) {
 // 	global->Set(String::NewFromUtf8(isolate, "RandomCrap"), FunctionTemplate::New(isolate, CGRC::ConstructHandle));
 
 
-	//CGRC::BindMemberFunction<int>(isolate, "xPrint", &RandomCrap::XPrint);
 
 	typedef ClassGear<RandomCrap> CGRC;
 	CGRC::Initialize(isolate);
 	MemberFunctionGear<RandomCrap, int, std::string>::Bind<&RandomCrap::XPrint>(isolate, "xPrint");
+	RandomCrapVX::BindRW(isolate, "vx");
 	CGRC::Bind(isolate, global);
 
 
