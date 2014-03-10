@@ -137,8 +137,6 @@ struct CO_Identifier<RandomCrap>
 //CO_Identifier<RandomCrap>::Value = "RandomCrap";
 
 
-typedef MemberVariableGear<RandomCrap, std::string, &RandomCrap::vx> RandomCrapVX;
-
 // Creates a new execution environment containing the built-in
 // functions.
 Handle<v8::Context> CreateShellContext(v8::Isolate* isolate) {
@@ -153,25 +151,12 @@ Handle<v8::Context> CreateShellContext(v8::Isolate* isolate) {
 
 	global->Set(String::NewFromUtf8(isolate, "dblValue"), FunctionTemplate::New(isolate, BindDouble));
 
-// 	global->Set(String::NewFromUtf8(isolate, "RandomCrap"), FunctionTemplate::New(isolate, CGRC::ConstructHandle));
-
-
 
 	typedef ClassGear<RandomCrap> CGRC;
 	CGRC::Initialize(isolate);
 	MemberFunctionGear<RandomCrap, int, std::string>::Bind<&RandomCrap::XPrint>(isolate, "xPrint");
-	RandomCrapVX::BindRW(isolate, "vx");
+	MemberVariableGear<RandomCrap, std::string, &RandomCrap::vx>::BindRW(isolate, "vx");
 	CGRC::Bind(isolate, global);
-
-
-	// This works.
-// 	Local<ObjectTemplate> protoTmpl = Local<ObjectTemplate>::New(isolate, CGRC::PrototypeTemplate);
-// 	Local<FunctionTemplate> lft = FunctionTemplate::New(isolate, MemberFunctionGear<RandomCrap, int>::Invoke<&RandomCrap::XPrint>);
-// 	protoTmpl->Set(String::NewFromUtf8(isolate, "xPrint"), lft);
-
-
-
-	//global->SetAccessor(String::NewFromUtf8(isolate, "lol"), RandomCrapVX::Getter);
 
 	global->Set(String::NewFromUtf8(isolate, "gear"), FunctionTemplate::New(isolate, StaticFunctionGear<int, std::string, std::string>::Invoke<xc>));
 	global->Set(String::NewFromUtf8(isolate, "gearx"), FunctionTemplate::New(isolate, StaticFunctionGear<int, std::string, std::string>::Invoke<xcx>));

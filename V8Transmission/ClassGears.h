@@ -52,13 +52,25 @@ namespace V8Transmission
 		typedef NativeType Type;
 		typedef NativeType* TypePtr;
 
+		////////////////////////////////////////////////////////////////////////////////////////////////////
+		/// <summary>
+		/// 	Initializes the initial templates properly for this ClassGear, if you don't call this before
+		/// 	trying to bind any other member function type things, you're going to have some serious issues.
+		/// 	
+		/// 	I repeat.
+		/// 	
+		/// 	THIS MUST BE CALLED BEFORE ANY OTHER FUNCTIONS OR TEMPLATES THAT ARE DEPENDENT UPON IT.
+		/// </summary>
+		///
+		/// <param name="iso">	[in,out] If non-null, the ISO. </param>
+		////////////////////////////////////////////////////////////////////////////////////////////////////
 		static void Initialize(Isolate* iso)
 		{
 			// If we're enabling constructor we worry about the constructor's FunctionTemplate, otherwise
 			// we don't care at all, and we'll just instantiate the prototype template and fill it accordingly.
 			if (CO_EnableConstructor<Type>::Value)
 			{
-				Local<FunctionTemplate> ctorTemplate = FunctionTemplate::New(iso, ConstructHandle);
+				Local<FunctionTemplate> ctorTemplate = FunctionTemplate::New(iso, ConstructorProxy);
 				ctorTemplate->SetClassName(v8::String::NewFromUtf8(iso, CO_Identifier<NativeType>::Value()->c_str()));
 
 				if (ConstructorTemplate.IsEmpty())
@@ -96,7 +108,16 @@ namespace V8Transmission
 			}
 		}
 
-
+		////////////////////////////////////////////////////////////////////////////////////////////////////
+		/// <summary>
+		/// 	Binds the constructor template into the scope of the specified object template, this does
+		/// 	nothing as of yet unless the CO_EnableConstructor<T>::Value is true, in the future it may
+		/// 	allow statics (and enums) to be bound to the scope of this type's name.
+		/// </summary>
+		///
+		/// <param name="iso"> 	[in,out] If non-null, the ISO. </param>
+		/// <param name="tmpl">	The template. </param>
+		////////////////////////////////////////////////////////////////////////////////////////////////////
 		static void Bind(Isolate* iso, const Handle<ObjectTemplate>& tmpl)
 		{
 			HandleScope scope(iso);
@@ -109,12 +130,28 @@ namespace V8Transmission
 			}
 		}
 
-		static void ConstructHandle(const FunctionCallbackInfo<Value>& arguments)
+		static void ConstructorProxy(const FunctionCallbackInfo<Value>& arguments)
 		{
 			TypePtr new_object = Factory::Construct(arguments);
 			arguments.GetReturnValue().Set(Wrap(arguments.GetIsolate(), new_object));
 		}
 
+		////////////////////////////////////////////////////////////////////////////////////////////////////
+		/// <summary>
+		/// 	Wraps the native type pointer into a new v8::Object handle and returns it, useful for
+		/// 	returning this type after it has been constructed natively back to the JS side.
+		/// 	
+		/// 	This also can be used even if the CO_EnableConstructor<T> is disabled for this type, as it
+		/// 	does not disallow returning it as a reference of this kind of object.
+		/// </summary>
+		///
+		/// <param name="iso">		 	[in,out] If non-null, the ISO. </param>
+		/// <param name="native_ptr">	The native pointer. </param>
+		///
+		/// <returns>
+		/// 	A Handle&lt;Object&gt;
+		/// </returns>
+		////////////////////////////////////////////////////////////////////////////////////////////////////
 		static Handle<Object> Wrap(Isolate* iso, TypePtr native_ptr)
 		{
 			Local<ObjectTemplate> tmpl = Local<ObjectTemplate>::New(iso, PrototypeTemplate);
@@ -133,6 +170,21 @@ namespace V8Transmission
 			return result;
 		}
 
+		////////////////////////////////////////////////////////////////////////////////////////////////////
+		/// <summary>
+		/// 	Unwraps the type stored in the v8::Value to the appropriate native type pointer.
+		/// 	
+		/// 	If enabled this does explicit type checking on the second internal field of the object.
+		/// 	If that type check fails, it returns nullptr.
+		/// </summary>
+		///
+		/// <param name="iso">	[in,out] If non-null, the ISO. </param>
+		/// <param name="obj">	The object. </param>
+		///
+		/// <returns>
+		/// 	A TypePtr.
+		/// </returns>
+		////////////////////////////////////////////////////////////////////////////////////////////////////
 		static TypePtr Unwrap(Isolate* iso, Handle<Value> obj)
 		{
 			Handle<External> field = Handle<External>::Cast(obj->ToObject()->GetInternalField(0));

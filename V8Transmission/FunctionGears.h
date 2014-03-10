@@ -125,6 +125,18 @@ namespace V8Transmission
 		{
 			Internal::Convert_Expand_Execute_Raw_Function_Pointer::Expander<0, sizeof...(ArgumentTypes), ReturnType, ArgumentTypes...>::expand(sfptr, args);
 		}
+
+		//global->Set(String::NewFromUtf8(isolate, "gear"), FunctionTemplate::New(isolate, StaticFunctionGear<int, std::string, std::string>::Invoke<xc>));
+
+
+		template <StaticFunctionPtr sfptr>
+		static void Bind(Isolate* iso, const char* name)
+		{
+			Local<ObjectTemplate> protoTmpl = Local<ObjectTemplate>::New(iso, ClassGear<ThisClass>::PrototypeTemplate);
+			Local<FunctionTemplate> lft = FunctionTemplate::New(iso, Invoke<mfptr>);
+
+			protoTmpl->Set(String::NewFromUtf8(iso, name), lft);
+		}
 	};
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////

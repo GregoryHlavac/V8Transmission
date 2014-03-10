@@ -48,4 +48,35 @@ namespace V8Transmission
 
 	template <int Val>
 	struct Integer_Option : Static_Option<int, Val> {};
+
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	/// <summary>
+	/// 	An object isolation context, in the future all ClassGear related things will require binding
+	/// 	themselves to this to allow using multiple isolations and things of that likeness.
+	/// 	
+	/// 	At least that's the theory, I've yet to look into this stuff yet.
+	/// </summary>
+	///
+	/// <typeparam name="T">	Generic type parameter. </typeparam>
+	////////////////////////////////////////////////////////////////////////////////////////////////////
+	template <typename ForType>
+	struct ObjectIsolationContext
+	{
+		typedef ForType Type;
+
+		v8::Isolate* isolate;
+		v8::Persistent<v8::FunctionTemplate>	ConstructorTemplate;
+		v8::Persistent<v8::ObjectTemplate>		PrototypeTemplate;
+	};
+
+	template <typename T>
+	v8::Isolate* V8Transmission::ObjectIsolationContext<T>::isolate;
+
+	template <typename T>
+	Persistent<FunctionTemplate> V8Transmission::ObjectIsolationContext<T>::ConstructorTemplate;
+
+	template <typename T>
+	Persistent<ObjectTemplate> V8Transmission::ObjectIsolationContext<T>::PrototypeTemplate;
+
+
 }
